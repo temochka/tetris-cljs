@@ -1,0 +1,34 @@
+body {
+	overflow: hidden;
+}
+
+.tetris-field {
+	width: 400px;
+	height: 480px;
+	border: 4px solid grey;
+	margin: -192px 0 0 -200px;
+	position: absolute;
+	top: 40%;
+	left: 50%;
+}
+
+.tetris-field .main-screen {
+	width: 200px;
+	padding: 20px;
+	float: left;
+}
+
+.tetris-field .status {
+	float: left;
+	width: 100px;
+	padding: 20px;
+}
+
+canvas {
+	background-color: black;
+}
+
+.status p {
+	text-transform: uppercase;
+	font-family: "Helvetica", sans-serif;
+}

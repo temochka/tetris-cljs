@@ -1,0 +1,7 @@
+{"version":3,
+ "file":
+ "/Users/artem/Projects/tetris/resources/public/out/dev_brepl.js",
+ "sources":["brepl.cljs"],
+ "lineCount":8,
+ "mappings":";AAAA;;;;AAGA,uCAAA,vCAACA",
+ "names":["clojure.browser.repl/connect"]}
