@@ -12,7 +12,6 @@
 (def screen-height 440)
 (def blocks-h 10)
 (def blocks-v 24)
-(def field-bg-color "#2a2f34")
 (def rendering-offset [0 -2])
 (def spawn-point [4 0])
 (def block-size (/ screen-width blocks-h))
@@ -66,27 +65,23 @@
 (def tetrimino-types
   (->> [["    "
          "cccc"
+         "    "
          "    "]
-        ["   "
+        ["b  "
          "bbb"
-         "  b"]
-        ["   "
+         "   "]
+        ["  o"
          "ooo"
-         "o  "]
-        ["    "
-         " yy "
-         " yy "
-         "    "]
-        ["   "
-         " ll"
+         "   "]
+        ["yy"
+         "yy"]
+        [" ll"
          "ll "
          "   "]
-        ["   "
+        [" m "
          "mmm"
-         " m "
          "   "]
-        ["   "
-         "rr "
+        ["rr "
          " rr"
          "   "]]
        (map tetrimino-type)
@@ -101,23 +96,24 @@
   (block (translate-point point dv) color))
 
 (defn translate-blocks [blocks dv]
-  (map #(translate-block % dv) blocks))
+  (doall (map #(translate-block % dv) blocks)))
 
 (defn tetrimino->blocks
   [{:keys [spin type pos]}]
   (translate-blocks (nth type spin) pos))
 
 (defn rows->blocks [rows]
-  (mapcat (fn [[y xs]]
-            (map (fn [[x color]]
-                   (block (point x y) color)) xs))
-          rows))
+  (doall
+    (mapcat (fn [[y xs]]
+              (map (fn [[x color]]
+                     (block (point x y) color)) xs))
+            rows)))
 
-(defn block->point [[point]] point)
+(defn block->point [block] (first block))
 
 (defn tetrimino->points
   [t]
-  (-> t tetrimino->blocks (map block->point)))
+  (-> t tetrimino->blocks (map block->point) doall))
 
 (defn draw-block [ctx offset [point color]]
   (let [[x y] (translate-point point offset)]
@@ -275,7 +271,7 @@
                level :level}]
   (aset score-text "innerText" score)
   (aset level-text "innerText" level)
-  (draw-background screen-ctx field-bg-color)
+  (draw-background screen-ctx "#2a2f34")
   (draw-background preview-screen-ctx "#3b4045")
   (when t (draw-blocks screen-ctx rendering-offset (tetrimino->blocks t)))
   (when tn (draw-blocks preview-screen-ctx (tetrimino->blocks tn)))
