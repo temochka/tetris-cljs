@@ -1,11 +1,12 @@
 body {
 	overflow: hidden;
+	background: #3b4045;
 }
 
 .tetris-field {
 	width: 400px;
 	height: 480px;
-	border: 4px solid grey;
+	border: 4px solid rgba(255,255,255,0.3);
 	margin: -192px 0 0 -200px;
 	position: absolute;
 	top: 40%;
@@ -30,5 +31,16 @@ canvas {
 
 .status p {
 	text-transform: uppercase;
+	letter-spacing: 2px;
 	font-family: "Helvetica", sans-serif;
+	text-align: center;
+	margin-left: -1em;
+	color: white;
+}
+
+.status p strong {
+	width: 100%;
+	display: block;
+	font-size: 3em;
+	letter-spacing: 0px;
 }

@@ -11,18 +11,22 @@
 (def screen-width 200)
 (def screen-height 440)
 (def blocks-h 10)
-(def blocks-v 22)
+(def blocks-v 24)
+(def field-bg-color "#2a2f34")
+(def rendering-offset [0 -2])
+(def spawn-point [4 0])
 (def block-size (/ screen-width blocks-h))
+(def block-border-size 1)
 (def score-multiplier 100)
 (def level-up-score 400)
 (def level-gravity-penalty 30)
-(def colors {\c "#2DFFFE"
-             \b "#0B24FB"
-             \o "#FDA428"
-             \y "#FFFD38"
-             \l "#85FD31"
-             \m "#7F0F7E"
-             \r "#FC0D1B"
+(def colors {\c "#34aadc"
+             \b "#087eff"
+             \o "#ffa01b"
+             \y "#ffd015"
+             \l "#54da6b"
+             \m "#a081ee"
+             \r "#ff5349"
              " " nil})
 (def controls {37 :left
                39 :right
@@ -38,16 +42,16 @@
 (defn block [point color]
   [point color])
 
-(defn- rotate-matrix [m]
+(defn rotate-matrix [m]
   (->> m reverse (apply map vector) vec))
 
-(defn- ascii->vector [ascii]
+(defn ascii->vector [ascii]
   (->> ascii (replace colors) vec))
 
-(defn- ascii-schema->matrix [schema]
+(defn ascii-schema->matrix [schema]
   (->> schema (map ascii->vector) vec))
 
-(defn- matrix->blocks [m]
+(defn matrix->blocks [m]
   (->> m
        (map-indexed (fn [y xs] (map-indexed (fn [x color] (block (point x y) color)) xs)))
        (apply concat)
@@ -60,53 +64,69 @@
     (->> ms (map matrix->blocks) vec)))
 
 (def tetrimino-types
-  (->> [["cccc"]
-        ["bbb"
+  (->> [["    "
+         "cccc"
+         "    "]
+        ["   "
+         "bbb"
          "  b"]
-        ["ooo"
+        ["   "
+         "ooo"
          "o  "]
-        ["yy"
-         "yy"]
-        [" ll"
-         "ll "]
-        ["mmm"
-         " m "]
-        ["rr "
-         " rr"]]
+        ["    "
+         " yy "
+         " yy "
+         "    "]
+        ["   "
+         " ll"
+         "ll "
+         "   "]
+        ["   "
+         "mmm"
+         " m "
+         "   "]
+        ["   "
+         "rr "
+         " rr"
+         "   "]]
        (map tetrimino-type)
        vec))
 
-(defn- local->world
-  [local world]
-  (vec (map + local world)))
+(defn translate-point
+  [point dv]
+  (vec (map + point dv)))
 
-(defn- translate-block
-  [[point color] world]
-  (block (local->world point world) color))
+(defn translate-block
+  [[point color] dv]
+  (block (translate-point point dv) color))
 
-(defn translate-blocks [blocks pos]
-  (map #(translate-block % pos) blocks))
+(defn translate-blocks [blocks dv]
+  (map #(translate-block % dv) blocks))
 
-(defn- tetrimino->blocks
+(defn tetrimino->blocks
   [{:keys [spin type pos]}]
   (translate-blocks (nth type spin) pos))
 
-(defn- rows->blocks [rows]
-  (mapcat (fn [[y xs]] (map (fn [[x color]] [[x y] color]) xs)) rows))
+(defn rows->blocks [rows]
+  (mapcat (fn [[y xs]]
+            (map (fn [[x color]]
+                   (block (point x y) color)) xs))
+          rows))
 
-(def block->point first)
+(defn block->point [[point]] point)
 
-(defn- tetrimino->points
+(defn tetrimino->points
   [t]
   (-> t tetrimino->blocks (map block->point)))
 
-(defn draw-block [ctx [[x y] color]]
-  (doto ctx
-    (aset "fillStyle" color)
-    (.fillRect (inc (* block-size x))
-               (inc (* block-size y))
-               (- block-size 2)
-               (- block-size 2))))
+(defn draw-block [ctx offset [point color]]
+  (let [[x y] (translate-point point offset)]
+    (doto ctx
+      (aset "fillStyle" color)
+      (.fillRect (+ (* block-size x) block-border-size)
+                 (+ (* block-size y) block-border-size)
+                 (- block-size (* 2 block-border-size))
+                 (- block-size (* 2 block-border-size))))))
 
 (defn tetrimino [pos spin type]
   {:pos pos :spin spin :type type})
@@ -114,15 +134,19 @@
 (defn rotate-tetrimino [{spin :spin :as t}]
   (assoc t :spin (rem (inc spin) 4)))
 
-(defn draw-blocks [ctx blocks] 
-  (doall (map #(draw-block ctx %) blocks)))
+(defn draw-blocks
+  ([ctx blocks] (draw-blocks ctx (point 0 0) blocks))
+  ([ctx offset blocks]
+   (doseq [block blocks]
+     (draw-block ctx offset block))))
 
 (defn random-tetrimino []
-  (tetrimino (point 0 0) (rand-nth (range 0 4)) (rand-nth tetrimino-types)))
+  (tetrimino (point 0 0)
+             (rand-nth (range 0 4))
+             (rand-nth tetrimino-types)))
 
-(defn move-tetrimino [{pos :pos :as t} d]
-  (let [dv (get directions d)]
-    (assoc t :pos (vec (map + dv pos)))))
+(defn move-tetrimino [t d]
+  (update-in t [:pos] translate-point (get directions d)))
 
 (defn collisions? [{t :tetrimino rows :rows}]
   (let [points (map block->point (tetrimino->blocks t))]
@@ -173,7 +197,7 @@
 
 (defn next-tetrimino [{t :next-tetrimino :as state}]
   (assoc state
-         :tetrimino (assoc t :pos [5 0])
+         :tetrimino (assoc t :pos spawn-point)
          :next-tetrimino (random-tetrimino)))
 
 (defn maybe-next-tetrimino [{tetr :tetrimino :as state}]
@@ -208,7 +232,6 @@
   (if-not t
     (assoc state :running? false)
     state))
-
 
 (defn maybe-level-up [{score :score :as state}]
   (assoc state :level (-> (/ score level-up-score) int inc)))
@@ -252,11 +275,11 @@
                level :level}]
   (aset score-text "innerText" score)
   (aset level-text "innerText" level)
-  (draw-background screen-ctx "#000000")
-  (draw-background preview-screen-ctx "#000000")
-  (when t (draw-blocks screen-ctx (tetrimino->blocks t)))
+  (draw-background screen-ctx field-bg-color)
+  (draw-background preview-screen-ctx "#3b4045")
+  (when t (draw-blocks screen-ctx rendering-offset (tetrimino->blocks t)))
   (when tn (draw-blocks preview-screen-ctx (tetrimino->blocks tn)))
-  (draw-blocks screen-ctx (rows->blocks rows)))
+  (draw-blocks screen-ctx rendering-offset (rows->blocks rows)))
 
 (defn render-loop []
   (render @game-state)
@@ -264,9 +287,6 @@
 
 (defn handle-key-press [state key-code]
   (assoc state :pressed-key (get controls key-code)))
-
-(defn new-game! []
-  (swap! game-state #(-> % next-tetrimino)))
 
 (defn run-game-cycle [{:keys [running? tetrimino] :as state}]
   (if running?
