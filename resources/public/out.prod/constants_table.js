@@ -16,6 +16,7 @@ cljs.core.constant$keyword$7 = new cljs.core.Keyword(null,"default","default");
 cljs.core.constant$keyword$34 = new cljs.core.Keyword(null,"finally-block","finally-block");
 cljs.core.constant$keyword$11 = new cljs.core.Keyword(null,"value","value");
 cljs.core.constant$keyword$39 = new cljs.core.Keyword(null,"compute","compute");
+cljs.core.constant$keyword$64 = new cljs.core.Keyword(null,"move","move");
 cljs.core.constant$keyword$51 = new cljs.core.Keyword(null,"pos","pos");
 cljs.core.constant$keyword$31 = new cljs.core.Keyword(null,"recur","recur");
 cljs.core.constant$keyword$22 = new cljs.core.Keyword(null,"type","type");
