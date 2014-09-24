@@ -11,6 +11,7 @@
   :cljsbuild {:builds [{:id "dev"
                         :source-paths ["src"]
                         :compiler {:output-to "resources/public/tetris.js"
+                                   :output-dir "resources/public/out"
                                    :optimizations :none
                                    :source-map true}}
                        {:id "prod"
