@@ -283,6 +283,30 @@
   [state key-code]
   (assoc state :pressed-key (get controls key-code)))
 
+(defn time-left
+  "Given a timestamp and a time interval, returns a remaining interval
+   since then."
+  [ts interval]
+  (max 0 (- interval (- (current-timestamp) ts))))
+
+(defn empty-block [[point color]]
+  (block point nil))
+
+(defn state->blocks [{t :tetrimino rows :rows}]
+  (concat (if t (tetrimino->blocks t) [])
+          (if rows (rows->blocks rows) [])))
+
+(defn blocks-diff [a b]
+  (let [b-index (into {} b)]
+    (remove (fn [[point _]] (contains? b-index point)) a)))
+
+(defn render-diff [old-state new-state]
+  (let [before (state->blocks old-state)
+        after (state->blocks new-state)
+        forward-diff (blocks-diff after before)
+        backward-diff (blocks-diff before after)]
+    (concat forward-diff (map empty-block backward-diff))))
+
 (def time-flow (chan))
 
 (def game-state (atom {:rows (sorted-map)
@@ -292,12 +316,7 @@
                        :score 0
                        :level 1
                        :running? true}))
-
-(defn time-left
-  "Given a timestamp and a time interval, returns a remaining interval
-   since then."
-  [ts interval]
-  (max 0 (- interval (- (current-timestamp) ts))))
+(def render-queue (atom cljs.core.PersistentQueue.EMPTY))
 
 (add-watch game-state
            :time-flow
@@ -305,6 +324,10 @@
              (go (>! time-flow
                      (time-left (or now (current-timestamp))
                                 game-loop-freq)))))
+(add-watch game-state
+           :render-pipeline
+           (fn [_ _ before after]
+             (swap! render-queue concat (render-diff before after))))
 
 (defn draw-background
   "Given an HTML Canvas, draws a background of given width and height."
@@ -317,12 +340,15 @@
   "Draws a colored Tetris block using a given HTML Canvas context."
   [ctx offset [point color]]
   (let [[x y] (translate-point point offset)]
-    (doto ctx
-      (aset "fillStyle" color)
-      (.fillRect (+ (* block-size x) block-border-size)
-                 (+ (* block-size y) block-border-size)
-                 (- block-size (* 2 block-border-size))
-                 (- block-size (* 2 block-border-size))))))
+    (if color
+      (doto ctx
+        (aset "fillStyle" color)
+        (.fillRect (+ (* block-size x) block-border-size)
+                   (+ (* block-size y) block-border-size)
+                   (- block-size (* 2 block-border-size))
+                   (- block-size (* 2 block-border-size))))
+      (doto ctx
+        (.clearRect (* block-size x) (* block-size y) block-size block-size)))))
 
 (defn draw-blocks
   "Draws a sequence of blocks on HTML canvas."
@@ -333,23 +359,22 @@
 
 (defn render
   "Draws everything on the screen."
-  [{t :tetrimino
-    tn :next-tetrimino
-    rows :rows
+  [{tn :next-tetrimino
     score :score
-    level :level}]
+    level :level}
+   screen-updates]
   (aset score-text "innerText" score)
   (aset level-text "innerText" level)
-  (draw-background screen-ctx "#2a2f34")
   (draw-background preview-ctx "#3b4045")
-  (when t (draw-blocks screen-ctx rendering-offset (tetrimino->blocks t)))
   (when tn (draw-blocks preview-ctx (tetrimino->blocks tn)))
-  (draw-blocks screen-ctx rendering-offset (rows->blocks rows)))
+  (let [blocks (take (count screen-updates) screen-updates)]
+    (draw-blocks screen-ctx rendering-offset blocks)
+    (count blocks)))
 
 (defn render-loop
   "Starts the rendering loop using requestAnimationFrame callback."
   []
-  (render @game-state)
+  (swap! render-queue (partial drop (render @game-state @render-queue)))
   (.requestAnimationFrame js/window render-loop))
 
 (defn run-game-cycle
