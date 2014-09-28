@@ -10,6 +10,7 @@
 (def screen-height 440)
 (def blocks-h 10)
 (def blocks-v 24)
+(def game-loop-freq 10)
 (def block-size (/ screen-width blocks-h))
 (def block-border-size 1)
 (def rendering-offset [0 -2])
@@ -195,10 +196,15 @@
         (maybe-rollback state freeze))
     state))
 
+(defn current-timestamp
+  "Returns a current timestamp in milliseconds."
+  []
+  (.getTime (js/Date.)))
+
 (defn process-time
   "Adds current :now timestamp in milliseconds to a given state map."
   [state]
-  (assoc state :now (.getTime (js/Date.))))
+  (assoc state :now (current-timestamp)))
 
 (defn next-tetrimino
   "First swaps :tetrimino and :next-tetrimino map keys, then assigns a random
@@ -277,6 +283,8 @@
   [state key-code]
   (assoc state :pressed-key (get controls key-code)))
 
+(def time-flow (chan))
+
 (def game-state (atom {:rows (sorted-map)
                        :tetrimino nil
                        :next-tetrimino (random-tetrimino)
@@ -284,6 +292,19 @@
                        :score 0
                        :level 1
                        :running? true}))
+
+(defn time-left
+  "Given a timestamp and a time interval, returns a remaining interval
+   since then."
+  [ts interval]
+  (max 0 (- interval (- (current-timestamp) ts))))
+
+(add-watch game-state
+           :time-flow
+           (fn [_ _ _ {now :now}]
+             (go (>! time-flow
+                     (time-left (or now (current-timestamp))
+                                game-loop-freq)))))
 
 (defn draw-background
   "Given an HTML Canvas, draws a background of given width and height."
@@ -350,5 +371,5 @@
 (render-loop)
 (go-loop [_ nil]
   (swap! game-state run-game-cycle)
-  (recur (<! (timeout 10))))
+  (recur (<! (timeout (<! time-flow)))))
 
