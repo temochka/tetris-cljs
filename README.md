@@ -1,4 +1,4 @@
-# Tetris in ClojureScript ![](https://temochka.dploy.io/badge/56046447885616/12312.png)
+# Tetris in ClojureScript ![http://dploy.io/](https://temochka.dploy.io/badge/56046447885616/12312.png)
 
 ![](http://img.temochka.com/tetris-cljs.png)
 
