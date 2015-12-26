@@ -1,4 +1,8 @@
-(ns dev-brepl
+(ns brepl
   (:require [clojure.browser.repl :as repl]))
 
-(repl/connect "http://localhost:9000/repl")
+(enable-console-print!)
+
+(defonce conn
+  (repl/connect "http://localhost:9000/repl"))
+
