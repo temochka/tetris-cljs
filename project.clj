@@ -7,7 +7,8 @@
                  [org.clojure/clojurescript "1.7.170"]
                  [org.clojure/core.async "0.2.374"]]
   :profiles {:dev {:dependencies [[com.cemerick/piggieback "0.2.1"]
-                                  [org.clojure/tools.nrepl "0.2.10"]]}}
+                                  [org.clojure/tools.nrepl "0.2.10"]
+                                  [weasel "0.7.0" :exclusions [org.clojure/clojurescript]]]}}
   :plugins [[lein-cljsbuild "1.1.2"]]
   :clean-targets ^{:protect false} [:target-path
                                     [:cljsbuild :builds :dev :compiler :output-dir] [:cljsbuild :builds :dev :compiler :output-to] [:cljsbuild :builds :prod :compiler :output-to]]

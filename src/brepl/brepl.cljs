@@ -1,8 +1,5 @@
 (ns brepl
-  (:require [clojure.browser.repl :as repl]))
+  (:require [weasel.repl :as repl]))
 
-(enable-console-print!)
-
-(defonce conn
-  (repl/connect "http://localhost:9000/repl"))
-
+(when-not (repl/alive?)
+  (repl/connect "ws://localhost:9001"))
