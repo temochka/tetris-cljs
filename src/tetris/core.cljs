@@ -2,6 +2,8 @@
   (:require [cljs.core.async :refer [chan >! <! timeout]])
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
 
+(enable-console-print!)
+
 (def screen-ctx (-> js/document (.getElementById "screen") (.getContext "2d")))
 (def preview-ctx (-> js/document (.getElementById "preview-screen") (.getContext "2d")))
 (def level-text (.getElementById js/document "level"))
@@ -25,10 +27,12 @@
              \m "#a081ee" ;magenta
              \r "#ff5349" ;red
              " " nil})
-(def controls {37 :left
-               39 :right
-               40 :down
-               38 :rotate})
+(def controls {37 :left ; ←
+               39 :right ; →
+               40 :down ; ↓
+               38 :rotate ; ↑
+               80 :pause ; p
+               })
 (def directions {:down [0 1]
                  :right [1 0]
                  :left [-1 0]})
@@ -263,17 +267,24 @@
   (assoc state :level (-> (/ score level-up-score) int inc)))
 
 (defmulti process-keyboard
-  (fn [{key :pressed-key}] (if (contains? directions key) :move key)))
+  (fn [{key :pressed-key mode :mode}]
+    [mode (if (contains? directions key) :move key)]))
 
-(defmethod process-keyboard :move [{key :pressed-key :as state}]
+(defmethod process-keyboard [:game :move] [{key :pressed-key :as state}]
   (-> state
       (update-in [:tetrimino] move-tetrimino key)
       (maybe-rollback state)))
 
-(defmethod process-keyboard :rotate [state]
+(defmethod process-keyboard [:game :rotate] [state]
   (-> state
       (update-in [:tetrimino] rotate-tetrimino)
       (maybe-rollback state)))
+
+(defmethod process-keyboard [:game :pause] [state]
+  (assoc state :mode :pause))
+
+(defmethod process-keyboard [:pause :pause] [state]
+  (assoc state :mode :game))
 
 (defmethod process-keyboard :default [state] state)
 
@@ -291,7 +302,7 @@
                        :gravity-interval 500
                        :score 0
                        :level 1
-                       :running? true}))
+                       :mode :game}))
 
 (defn time-left
   "Given a timestamp and a time interval, returns a remaining interval
@@ -354,18 +365,16 @@
 
 (defn run-game-cycle
   "Puts everything together."
-  [{:keys [running? tetrimino] :as state}]
-  (if running?
-    (-> state
-        process-time
-        process-keyboard
-        release-keyboard
-        process-gravity
-        maybe-score
-        maybe-level-up
-        maybe-next-tetrimino
-        maybe-game-over)
-    state))
+  [{:keys [mode tetrimino] :as state}]
+  (cond-> state
+          true process-time
+          true process-keyboard
+          true release-keyboard
+          (= mode :game) process-gravity
+          (= mode :game) maybe-score
+          (= mode :game) maybe-level-up
+          (= mode :game) maybe-next-tetrimino
+          (= mode :game) maybe-game-over))
 
 (.addEventListener js/document "keydown" #(swap! game-state handle-key-press (.-keyCode %)) false)
 (render-loop)
