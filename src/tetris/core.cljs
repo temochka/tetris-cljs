@@ -8,13 +8,14 @@
 (def preview-ctx (-> js/document (.getElementById "preview-screen") (.getContext "2d")))
 (def level-text (.getElementById js/document "level"))
 (def score-text (.getElementById js/document "score"))
+(def fps-text (.getElementById js/document "fps"))
 (def screen-width 200)
 (def screen-height 440)
 (def blocks-h 10)
 (def blocks-v 24)
-(def fps 30)
+(def max-fps 30)
 (def game-loop-freq 30)
-(def render-freq (/ 1000 30))
+(def render-freq (/ 1000 max-fps))
 (def block-size (/ screen-width blocks-h))
 (def block-border-size 1)
 (def rendering-offset [0 -2])
@@ -212,6 +213,12 @@
   [state]
   (assoc state :now (current-timestamp)))
 
+(defn update-fps
+  [{{:keys [last-fps-update fps frames-counter]} :debug :as state}]
+  (if (zero? (time-left last-fps-update 1000))
+    (update-in state [:debug] assoc :fps frames-counter :frames-counter 0 :last-fps-update (current-timestamp))
+    (update-in state [:debug :frames-counter] inc)))
+
 (defn next-tetrimino
   "First swaps :tetrimino and :next-tetrimino map keys, then assigns a random
    tetrimino to the :next-tetrimino key."
@@ -305,7 +312,10 @@
                        :gravity-interval 500
                        :score 0
                        :level 1
-                       :mode :game}))
+                       :mode :game
+                       :debug {:fps max-fps
+                               :frames-counter 0
+                               :last-fps-update (current-timestamp)}}))
 
 (defn time-left
   "Given a timestamp and a time interval, returns a remaining interval
@@ -365,10 +375,11 @@
 
 (defn render-bar
   "Renders elements on the right bar."
-  [{tn :next-tetrimino score :score level :level}]
+  [{tn :next-tetrimino score :score level :level {fps :fps} :debug}]
   (draw-background preview-ctx "#3b4045")
   (aset score-text "innerText" score)
   (aset level-text "innerText" level)
+  (when fps-text (aset fps-text "innerText" fps))
   (draw-blocks preview-ctx (tetrimino->blocks tn)))
 
 (defn render-loop
@@ -386,6 +397,7 @@
   [{:keys [mode tetrimino] :as state}]
   (cond-> state
           true process-time
+          fps-text update-fps
           true process-keyboard
           true release-keyboard
           (= mode :game) process-gravity
