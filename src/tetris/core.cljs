@@ -12,7 +12,9 @@
 (def screen-height 440)
 (def blocks-h 10)
 (def blocks-v 24)
-(def game-loop-freq 10)
+(def fps 30)
+(def game-loop-freq 30)
+(def render-freq (/ 1000 30))
 (def block-size (/ screen-width blocks-h))
 (def block-border-size 1)
 (def rendering-offset [0 -2])
@@ -296,7 +298,8 @@
 
 (def time-flow (chan))
 
-(def game-state (atom {:rows (sorted-map)
+(def game-state (atom {:last-update 0
+                       :rows (sorted-map)
                        :tetrimino nil
                        :next-tetrimino (random-tetrimino)
                        :gravity-interval 500
@@ -342,26 +345,41 @@
    (doseq [block blocks]
      (draw-block ctx offset block))))
 
-(defn render
-  "Draws everything on the screen."
+(defn render-game?
+  [old-state new-state]
+  (let [f (juxt :tetrimino :rows)]
+    (not= (f old-state) (f new-state))))
+
+(defn render-game
+  "Draws on the screen."
   [{t :tetrimino
-    tn :next-tetrimino
-    rows :rows
-    score :score
-    level :level}]
+    rows :rows}]
+  (draw-background screen-ctx "#2a2f34")
+  (draw-blocks screen-ctx rendering-offset (tetrimino->blocks t))
+  (draw-blocks screen-ctx rendering-offset (rows->blocks rows)))
+
+(defn render-bar?
+  [old-state new-state]
+  (let [f (juxt :next-tetrimino :score :level)]
+    (not= (f old-state) (f new-state))))
+
+(defn render-bar
+  "Renders elements on the right bar."
+  [{tn :next-tetrimino score :score level :level}]
+  (draw-background preview-ctx "#3b4045")
   (aset score-text "innerText" score)
   (aset level-text "innerText" level)
-  (draw-background screen-ctx "#2a2f34")
-  (draw-background preview-ctx "#3b4045")
-  (when t (draw-blocks screen-ctx rendering-offset (tetrimino->blocks t)))
-  (when tn (draw-blocks preview-ctx (tetrimino->blocks tn)))
-  (draw-blocks screen-ctx rendering-offset (rows->blocks rows)))
+  (draw-blocks preview-ctx (tetrimino->blocks tn)))
 
 (defn render-loop
   "Starts the rendering loop using requestAnimationFrame callback."
-  []
-  (render @game-state)
-  (.requestAnimationFrame js/window render-loop))
+  [{:keys [last-update] :as old-state}]
+  (if (zero? (time-left last-update render-freq))
+    (let [new-state @game-state]
+      (when (render-game? old-state new-state) (render-game new-state))
+      (when (render-bar? old-state new-state) (render-bar new-state))
+      (.requestAnimationFrame js/window (partial render-loop (assoc new-state :last-update (current-timestamp)))))
+    (.requestAnimationFrame js/window (partial render-loop old-state))))
 
 (defn run-game-cycle
   "Puts everything together."
@@ -377,7 +395,7 @@
           (= mode :game) maybe-game-over))
 
 (.addEventListener js/document "keydown" #(swap! game-state handle-key-press (.-keyCode %)) false)
-(render-loop)
+(render-loop @game-state)
 (go-loop [_ nil]
   (swap! game-state run-game-cycle)
   (recur (<! (timeout (<! time-flow)))))
