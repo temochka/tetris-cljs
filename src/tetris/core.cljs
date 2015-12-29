@@ -267,7 +267,7 @@
   "Stop the game if there is no active tetrimino."
   [{t :tetrimino :as state}]
   (if-not t
-    (assoc state :running? false)
+    (assoc state :mode :game-over)
     state))
 
 (defn maybe-level-up
