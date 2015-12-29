@@ -365,7 +365,7 @@
   [{t :tetrimino
     rows :rows}]
   (draw-background screen-ctx "#2a2f34")
-  (draw-blocks screen-ctx rendering-offset (tetrimino->blocks t))
+  (when t (draw-blocks screen-ctx rendering-offset (tetrimino->blocks t)))
   (draw-blocks screen-ctx rendering-offset (rows->blocks rows)))
 
 (defn render-bar?
