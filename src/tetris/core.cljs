@@ -208,6 +208,12 @@
   []
   (.getTime (js/Date.)))
 
+(defn time-left
+  "Given a timestamp and a time interval, returns a remaining interval
+   since then."
+  [ts interval]
+  (max 0 (- interval (- (current-timestamp) ts))))
+
 (defn process-time
   "Adds current :now timestamp in milliseconds to a given state map."
   [state]
@@ -316,12 +322,6 @@
                        :debug {:fps max-fps
                                :frames-counter 0
                                :last-fps-update (current-timestamp)}}))
-
-(defn time-left
-  "Given a timestamp and a time interval, returns a remaining interval
-   since then."
-  [ts interval]
-  (max 0 (- interval (- (current-timestamp) ts))))
 
 (add-watch game-state
            :time-flow
