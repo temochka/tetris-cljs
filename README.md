@@ -1,4 +1,4 @@
-# Tetris in ClojureScript [![Deployment status from DeployBot](https://temochka.deploybot.com/badge/13023223942808/12312.svg)](http://deploybot.com)
+# Tetris in ClojureScript
 
 ![](http://img.temochka.com/tetris-cljs.png)
 
@@ -12,6 +12,6 @@ Learn from code or [play it online](http://tetris.temochka.com).
 
 ## License
 
-Copyright © 2014 Artem Chistyakov
+Copyright © 2017 Artem Chistyakov
 
 Distributed under the Eclipse Public License either version 1.0

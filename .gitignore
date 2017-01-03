@@ -11,3 +11,6 @@ pom.xml.asc
 /.lein-*
 /.nrepl-port
 /.repl
+/log
+/vendor/bundle
+/.bundle
