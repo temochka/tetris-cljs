@@ -11,17 +11,19 @@
                                   [weasel "0.7.0" :exclusions [org.clojure/clojurescript]]]}}
   :plugins [[lein-cljsbuild "1.1.2"]]
   :clean-targets ^{:protect false} [:target-path
-                                    [:cljsbuild :builds :dev :compiler :output-dir] [:cljsbuild :builds :dev :compiler :output-to] [:cljsbuild :builds :prod :compiler :output-to]]
+                                    [:cljsbuild :builds :dev :compiler :output-dir]
+                                    [:cljsbuild :builds :dev :compiler :output-to]
+                                    [:cljsbuild :builds :prod :compiler :output-to]]
   :cljsbuild {:builds {:dev {:source-paths ["src"]
-                             :compiler {:output-to "resources/public/tetris.js"
+                             :compiler {:output-to "resources/public/js-dev/tetris.js"
                                         :main tetris.core
-                                        :output-dir "resources/public/out"
-                                        :asset-path "/out"
+                                        :output-dir "resources/public/js-dev/out"
+                                        :asset-path "/js-dev/out"
                                         :optimizations :none
                                         :source-map true
                                         :compiler-stats true}}
                        :prod {:source-paths ["src/tetris"]
-                              :compiler {:output-to "resources/public/tetris.min.js"
+                              :compiler {:output-to "resources/public/js/tetris.min.js"
                                          :main tetris.core
                                          :optimizations :advanced
                                          :compiler-stats true
