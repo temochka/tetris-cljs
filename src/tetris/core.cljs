@@ -1,8 +1,4 @@
-(ns ^:figwheel-hooks tetris.core
-  (:require [cljs.core.async :refer [chan >! <! timeout]])
-  (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
-
-(enable-console-print!)
+(ns ^:figwheel-hooks tetris.core)
 
 (def screen-ctx (-> js/document (.getElementById "screen") (.getContext "2d")))
 (def preview-ctx (-> js/document (.getElementById "preview-screen") (.getContext "2d")))
@@ -14,8 +10,6 @@
 (def blocks-h 10)
 (def blocks-v 24)
 (def max-fps 30)
-(def game-loop-freq 30)
-(def render-freq (/ 1000 max-fps))
 (def block-size (/ screen-width blocks-h))
 (def block-border-size 1)
 (def rendering-offset [0 -2])
@@ -35,10 +29,25 @@
                40 :down ; ↓
                38 :rotate ; ↑
                80 :pause ; p
+               13 :newgame ; ⏎
+               187 :cheat ; = (+)
                })
 (def directions {:down [0 1]
                  :right [1 0]
                  :left [-1 0]})
+(def initial-state
+  {:last-update 0
+   :rows (sorted-map)
+   :tetrimino nil
+   :next-tetrimino nil
+   :gravity-interval 500
+   :last-gravity 0
+   :score 0
+   :level 1
+   :mode :game
+   :debug {:fps 0
+           :frames-counter 0
+           :last-fps-update 0}})
 
 (defn point
   "A coordinate on a screen or a vector."
@@ -230,7 +239,7 @@
    tetrimino to the :next-tetrimino key."
   [{t :next-tetrimino :as state}]
   (assoc state
-         :tetrimino (assoc t :pos (point 4 0))
+         :tetrimino (assoc (or t (random-tetrimino)) :pos (point 4 0))
          :next-tetrimino (random-tetrimino)))
 
 (defn maybe-next-tetrimino
@@ -239,9 +248,6 @@
   (if-not tetr
     (-> state next-tetrimino (maybe-rollback state))
     state))
-
-(defn release-keyboard [state]
-  (assoc state :pressed-key nil))
 
 (defn collapse-rows
   "Collapses completed rows of Tetris blocks."
@@ -281,55 +287,62 @@
   [{score :score :as state}]
   (assoc state :level (-> (/ score level-up-score) int inc)))
 
+(defn poll-keyboard [queue-atom]
+  (let [dequeued (atom (list))]
+    (swap!
+      queue-atom
+      (fn [queue]
+        (reset! dequeued queue)
+        (empty queue)))
+    @dequeued))
+
 (defmulti process-keyboard
-  (fn [{key :pressed-key mode :mode}]
+  (fn [{mode :mode} key]
     [mode (if (contains? directions key) :move key)]))
 
-(defmethod process-keyboard [:game :move] [{key :pressed-key :as state}]
+(defmethod process-keyboard [:game :move] [state key]
   (-> state
       (update-in [:tetrimino] move-tetrimino key)
       (maybe-rollback state)))
 
-(defmethod process-keyboard [:game :rotate] [state]
+(defmethod process-keyboard [:game :rotate] [state key]
   (-> state
       (update-in [:tetrimino] rotate-tetrimino)
       (maybe-rollback state)))
 
-(defmethod process-keyboard [:game :pause] [state]
+(defmethod process-keyboard [:game :newgame] [state key]
+  initial-state)
+
+(defmethod process-keyboard [:pause :newgame] [state key]
+  initial-state)
+
+(defmethod process-keyboard [:game-over :newgame] [state key]
+  initial-state)
+
+(defmethod process-keyboard [:pause :cheat] [state key]
+  (update state :score + 100))
+
+(defmethod process-keyboard [:game :pause] [state key]
   (assoc state :mode :pause))
 
-(defmethod process-keyboard [:pause :pause] [state]
+(defmethod process-keyboard [:pause :pause] [state key]
   (assoc state :mode :game))
 
-(defmethod process-keyboard :default [state] state)
+(defmethod process-keyboard :default [state key] state)
 
 (defn handle-key-press
   "Transforms a given key code to a controls keyword and 
-   saves it into a given state map."
-  [state key-code]
-  (assoc state :pressed-key (get controls key-code)))
+   pushes it onto the keyboard queue."
+  [queue key-code]
+  (if-let [key (get controls key-code)]
+    (conj queue (get controls key-code))
+    queue))
 
-(def time-flow (chan))
+(defonce keyboard-queue
+  (atom (list)))
 
 (defonce game-state
-  (atom {:last-update 0
-         :rows (sorted-map)
-         :tetrimino nil
-         :next-tetrimino (random-tetrimino)
-         :gravity-interval 500
-         :score 0
-         :level 1
-         :mode :game
-         :debug {:fps max-fps
-                 :frames-counter 0
-                 :last-fps-update (current-timestamp)}}))
-
-(add-watch game-state
-           :time-flow
-           (fn [_ _ _ {now :now}]
-             (go (>! time-flow
-                     (time-left (or now (current-timestamp))
-                                game-loop-freq)))))
+  (atom initial-state))
 
 (defn draw-background
   "Given an HTML Canvas, draws a background of given width and height."
@@ -370,9 +383,9 @@
   (draw-blocks screen-ctx rendering-offset (rows->blocks rows)))
 
 (defn render-bar?
-  [old-state new-state]
+  [old-state {:keys [next-tetrimino] :as new-state}]
   (let [f (juxt :next-tetrimino :score :level)]
-    (not= (f old-state) (f new-state))))
+    (and next-tetrimino (not= (f old-state) (f new-state)))))
 
 (defn render-bar
   "Renders elements on the right bar."
@@ -383,36 +396,34 @@
   (when fps-text (aset fps-text "innerText" fps))
   (draw-blocks preview-ctx (tetrimino->blocks tn)))
 
-(defn render-loop
-  "Starts the rendering loop using requestAnimationFrame callback."
-  [{:keys [last-update] :as old-state}]
-  (if (zero? (time-left last-update render-freq))
-    (let [new-state @game-state]
-      (when (render-game? old-state new-state) (render-game new-state))
-      (when (render-bar? old-state new-state) (render-bar new-state))
-      (.requestAnimationFrame js/window (partial render-loop (assoc new-state :last-update (current-timestamp)))))
-    (.requestAnimationFrame js/window (partial render-loop old-state))))
-
 (defn run-game-cycle
   "Puts everything together."
-  [{:keys [mode tetrimino] :as state}]
+  [{:keys [mode tetrimino] :as state} key-presses]
   (cond-> state
+          true (#(reduce process-keyboard % key-presses))
           true process-time
           fps-text update-fps
-          true process-keyboard
-          true release-keyboard
           (= mode :game) process-gravity
           (= mode :game) maybe-score
           (= mode :game) maybe-level-up
           (= mode :game) maybe-next-tetrimino
           (= mode :game) maybe-game-over))
 
+(defn game-loop
+  "Starts the rendering loop using requestAnimationFrame callback."
+  [{:keys [last-update] :as old-state}]
+  (swap! game-state run-game-cycle (poll-keyboard keyboard-queue))
+  (let [new-state @game-state]
+    (when (render-game? old-state new-state) (render-game new-state))
+    (when (render-bar? old-state new-state) (render-bar new-state))
+    (.requestAnimationFrame js/window (partial game-loop (assoc new-state :last-update (current-timestamp))))))
 
 (defn setup []
-  (.addEventListener js/document "keydown" #(swap! game-state handle-key-press (.-keyCode %)) false)
-  (render-loop @game-state)
-  (go-loop [_ nil]
-           (swap! game-state run-game-cycle)
-           (recur (<! (timeout (<! time-flow))))))
+  (enable-console-print!)
+
+  (.addEventListener js/document "keydown" #(swap! keyboard-queue handle-key-press (.-keyCode %)) false)
+
+  (game-loop @game-state))
 
 (defonce init-block (setup))
+
