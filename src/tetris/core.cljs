@@ -1,4 +1,4 @@
-(ns tetris.core
+(ns ^:figwheel-hooks tetris.core
   (:require [cljs.core.async :refer [chan >! <! timeout]])
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
 
@@ -311,17 +311,18 @@
 
 (def time-flow (chan))
 
-(def game-state (atom {:last-update 0
-                       :rows (sorted-map)
-                       :tetrimino nil
-                       :next-tetrimino (random-tetrimino)
-                       :gravity-interval 500
-                       :score 0
-                       :level 1
-                       :mode :game
-                       :debug {:fps max-fps
-                               :frames-counter 0
-                               :last-fps-update (current-timestamp)}}))
+(defonce game-state
+  (atom {:last-update 0
+         :rows (sorted-map)
+         :tetrimino nil
+         :next-tetrimino (random-tetrimino)
+         :gravity-interval 500
+         :score 0
+         :level 1
+         :mode :game
+         :debug {:fps max-fps
+                 :frames-counter 0
+                 :last-fps-update (current-timestamp)}}))
 
 (add-watch game-state
            :time-flow
@@ -406,9 +407,12 @@
           (= mode :game) maybe-next-tetrimino
           (= mode :game) maybe-game-over))
 
-(.addEventListener js/document "keydown" #(swap! game-state handle-key-press (.-keyCode %)) false)
-(render-loop @game-state)
-(go-loop [_ nil]
-  (swap! game-state run-game-cycle)
-  (recur (<! (timeout (<! time-flow)))))
 
+(defn setup []
+  (.addEventListener js/document "keydown" #(swap! game-state handle-key-press (.-keyCode %)) false)
+  (render-loop @game-state)
+  (go-loop [_ nil]
+           (swap! game-state run-game-cycle)
+           (recur (<! (timeout (<! time-flow))))))
+
+(defonce init-block (setup))

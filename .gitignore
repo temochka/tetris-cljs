@@ -1,3 +1,5 @@
+.rebel*
+/.cpcache
 /target
 /out
 /resources/public/js*

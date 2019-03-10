@@ -1,0 +1,3 @@
+{:main tetris.core
+ :output-to "target/public/js/tetris.min.js"
+ :optimizations :advanced}
