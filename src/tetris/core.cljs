@@ -1,6 +1,7 @@
 (ns ^:figwheel-hooks tetris.core)
 
 (def screen-ctx (-> js/document (.getElementById "screen") (.getContext "2d")))
+(def particles-ctx (-> js/document (.getElementById "particles-screen") (.getContext "2d")))
 (def preview-ctx (-> js/document (.getElementById "preview-screen") (.getContext "2d")))
 (def level-text (.getElementById js/document "level"))
 (def score-text (.getElementById js/document "score"))
@@ -38,6 +39,7 @@
 (def initial-state
   {:last-update 0
    :rows (sorted-map)
+   :particles nil
    :tetrimino nil
    :next-tetrimino nil
    :gravity-interval 500
@@ -45,6 +47,8 @@
    :score 0
    :level 1
    :mode :game
+   :now 0
+   :dt 0
    :debug {:fps 0
            :frames-counter 0
            :last-fps-update 0}})
@@ -212,6 +216,18 @@
         (maybe-rollback state freeze))
     state))
 
+(defn process-particles
+  "Update particle positions based on their locations."
+  [{:keys [particles dt] :as state}]
+  (assoc state
+         :particles
+         (transduce
+           (comp (filter (comp pos? :ttl))
+                 (map #(update % :ttl - dt))
+                 (map #((:f %) % dt)))
+           conj
+           particles)))
+
 (defn current-timestamp
   "Returns a current timestamp in milliseconds."
   []
@@ -224,9 +240,12 @@
   (max 0 (- interval (- (current-timestamp) ts))))
 
 (defn process-time
-  "Adds current :now timestamp in milliseconds to a given state map."
-  [state]
-  (assoc state :now (current-timestamp)))
+  "Updates the :now and :dt values in a given state map."
+  [{old-now :now :as state}]
+  (let [now (current-timestamp)]
+    (assoc state
+           :now now
+           :dt (- now old-now))))
 
 (defn update-fps
   [{{:keys [last-fps-update fps frames-counter]} :debug :as state}]
@@ -286,6 +305,31 @@
   "Sets the current level number according to the current score."
   [{score :score :as state}]
   (assoc state :level (-> (/ score level-up-score) int inc)))
+
+(defn maybe-explode
+  [{:keys [rows particles] :as state}]
+  (let [generator (fn [[point color]]
+                    (let [[x y] (translate-point point rendering-offset)
+                          angle (+ (/ Math/PI 3) (rand (/ Math/PI 3)))
+                          velocity 2
+                          start-ttl (+ 800 (int (rand 200)))
+                          dx (Math/cos angle)
+                          dy (- (Math/sin angle))]
+                      {:color color
+                       :ttl start-ttl
+                       :f (fn [{:keys [x y ttl] :as self} dt]
+                            (let [life-progress (/ ttl start-ttl)
+                                  x (+ x (* dt dx (Math/log (* velocity life-progress))))
+                                  y (+ y (* dt dy (Math/log (* velocity life-progress))))]
+                              (assoc self :x x :y y)))
+                       :x (* x (+ block-size block-border-size block-border-size))
+                       :y (* y (+ block-size block-border-size block-border-size))}))
+        new-particles (->> rows
+                           (filter (fn [[_ v]] (= blocks-h (count v))))
+                           rows->blocks
+                           (map generator)
+                           doall)]
+    (assoc state :particles (reduce conj particles new-particles))))
 
 (defn poll-keyboard [queue-atom]
   (let [dequeued (atom (list))]
@@ -396,14 +440,27 @@
   (when fps-text (aset fps-text "innerText" fps))
   (draw-blocks preview-ctx (tetrimino->blocks tn)))
 
+(defn render-particles
+  "Renders particles on the screen."
+  [{:keys [particles]}]
+  (.clearRect particles-ctx 0 0 screen-width screen-height)
+  (doseq [{:keys [x y color]} particles]
+    (doto particles-ctx
+      (aset "fillStyle" "#FFFFFF")
+      (.fillRect x y (+ block-size block-border-size) (+ block-size block-border-size))
+      (aset "fillStyle" color)
+      (.fillRect (+ x block-border-size) (+ y block-border-size) block-size block-size))))
+
 (defn run-game-cycle
   "Puts everything together."
   [{:keys [mode tetrimino] :as state} key-presses]
   (cond-> state
           true (#(reduce process-keyboard % key-presses))
           true process-time
+          true process-particles
           fps-text update-fps
           (= mode :game) process-gravity
+          (= mode :game) maybe-explode
           (= mode :game) maybe-score
           (= mode :game) maybe-level-up
           (= mode :game) maybe-next-tetrimino
@@ -416,6 +473,7 @@
   (let [new-state @game-state]
     (when (render-game? old-state new-state) (render-game new-state))
     (when (render-bar? old-state new-state) (render-bar new-state))
+    (render-particles new-state)
     (.requestAnimationFrame js/window (partial game-loop (assoc new-state :last-update (current-timestamp))))))
 
 (defn setup []

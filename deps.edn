@@ -3,6 +3,7 @@
         com.bhauman/figwheel-main {:mvn/version "0.2.0"}
         com.bhauman/rebel-readline-cljs {:mvn/version "0.1.4"}}
  :aliases {:fig {:main-opts ["-m" "figwheel.main"]}
+           :dev {:main-opts ["-m" "figwheel.main" "--build" "dev" "-r"]}
            :build {:main-opts ["-m" "figwheel.main" "--build-once" "prod"]}}
  :paths ["src" "target" "resources"]
  }

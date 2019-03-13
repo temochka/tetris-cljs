@@ -26,6 +26,7 @@ body {
 	width: 200px;
 	padding: 20px;
 	float: left;
+    position: relative;
 }
 
 .tetris-field .status {
@@ -36,6 +37,13 @@ body {
 
 canvas {
 	background-color: black;
+}
+
+canvas.particles-screen {
+    background-color: transparent;
+    position: absolute;
+    top: 0;
+    left: 0;
 }
 
 .status p {
