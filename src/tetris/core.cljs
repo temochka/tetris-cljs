@@ -17,6 +17,7 @@
 (def score-multiplier 100)
 (def level-up-score 400)
 (def level-gravity-penalty 30)
+(def background-color "#2a2f34")
 (def colors {\c "#34aadc" ;cyan
              \b "#087eff" ;blue
              \o "#ffa01b" ;orange
@@ -123,7 +124,7 @@
 (defn translate-point
   "Sums a point and a vector."
   [point dv]
-  (vec (map + point dv)))
+  (mapv + point dv))
 
 (defn translate-block
   "Translates block’s point by vector dv preserving color."
@@ -319,11 +320,11 @@
                        :ttl start-ttl
                        :f (fn [{:keys [x y ttl] :as self} dt]
                             (let [life-progress (/ ttl start-ttl)
-                                  x (+ x (* dt dx (Math/log (* velocity life-progress))))
-                                  y (+ y (* dt dy (Math/log (* velocity life-progress))))]
+                                  x (+ x (* dt dx (* 0.5 (Math/log (* velocity life-progress)))))
+                                  y (+ y (* dt dy (* 0.5 (Math/log (* velocity life-progress)))))]
                               (assoc self :x x :y y)))
-                       :x (* x (+ block-size block-border-size block-border-size))
-                       :y (* y (+ block-size block-border-size block-border-size))}))
+                       :x (* x block-size)
+                       :y (* y block-size)}))
         new-particles (->> rows
                            (filter (fn [[_ v]] (= blocks-h (count v))))
                            rows->blocks
@@ -422,7 +423,7 @@
   "Draws on the screen."
   [{t :tetrimino
     rows :rows}]
-  (draw-background screen-ctx "#2a2f34")
+  (draw-background screen-ctx background-color)
   (when t (draw-blocks screen-ctx rendering-offset (tetrimino->blocks t)))
   (draw-blocks screen-ctx rendering-offset (rows->blocks rows)))
 
@@ -446,7 +447,7 @@
   (.clearRect particles-ctx 0 0 screen-width screen-height)
   (doseq [{:keys [x y color]} particles]
     (doto particles-ctx
-      (aset "fillStyle" "#FFFFFF")
+      (aset "fillStyle" background-color)
       (.fillRect x y (+ block-size block-border-size) (+ block-size block-border-size))
       (aset "fillStyle" color)
       (.fillRect (+ x block-border-size) (+ y block-border-size) block-size block-size))))
